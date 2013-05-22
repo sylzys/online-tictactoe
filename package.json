@@ -1,9 +1,18 @@
 {
-    "name": "application-name"
-  , "version": "0.0.1"
-  , "private": true
-  , "dependencies": {
-      "express": "2.5.8"
-    , "jade": ">= 0.0.1"
+  "name": "test",
+  "dependencies": {
+    "express": "2.5.8",
+    "jade": ">= 0.0.1",
+    "jquery": ">= 0.0.1",
+    "socket.io": "0.9.3",
+    "ejs": ">0.0.1"
+  },
+  "subdomain": "sylzys-test",
+  "scripts": {
+    "start": "node app.js"
+  },
+  "version": "0.0.0-3",
+  "engines": {
+    "node": "0.8.x"
   }
 }
