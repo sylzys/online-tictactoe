@@ -20,7 +20,7 @@ $(document).ready(function(){
 	];
 
 	/* SOCKETS FUNCTIONS */
-	var socket = io.connect('http://localhost');
+	var socket = io.connect();
 
 /*
 ** Socket (init): 1st treatement when I connect to the socket
@@ -29,7 +29,7 @@ $(document).ready(function(){
 */
 socket.on('init', function (data) {
 	my_id = data['id'];
-
+	console.log("I'm " + my_id);
 	switch(data['pic']) {
 		case 1:
 		chosen = cross;
@@ -47,6 +47,14 @@ socket.on('init', function (data) {
 ** String info, String color
 **
 */
+socket.on('countdown', function (data) {
+	counter($('#countdown'), 5);
+	setTimeout(function() {
+		layer.clear(); loadBG(); piecesGroup = new Kinetic.Group({x: 101, y: 21});
+	}, 5000);
+	$('#countdown').text('');
+});
+
 socket.on('info', function (data) {
 	$('#infos').css({'color': data['color']});
 	$('#infos').html(data['info']);
@@ -61,16 +69,23 @@ socket.on('enemyMove', function (data) {
 		strokeWidth: 1
 	});
 
-  var pic = (chosen == cross) ? circle : cross; //displaying the enemy picture 
-			tile.off('mouseover mouseout mousedown touchstart mouseup touchend'); // disable mouse event on tile
-			tile.setOpacity(1);
-			var pic = (chosen == cross) ? circle : cross;
-			tile.setFillPatternImage( pic);
-			piecesGroup.add(tile);
-	  layer.draw(); // drawing enemy pic
+	var pic = (chosen == cross) ? circle : cross; //displaying the enemy picture
+	tile.off('mouseover mouseout mousedown touchstart mouseup touchend'); // disable mouse event on tile
+	tile.setOpacity(1);
+
+	tile.setFillPatternImage( pic);
+	piecesGroup.add(tile);
+	layer.draw(); // drawing enemy pic
 	});
 
-
+function counter($el, n) {
+    (function loop() {
+       $el.html("<br />A new game will start in "+n+ " seconds");
+       if (n--) {
+           setTimeout(loop, 1000);
+       }
+    })();
+}
 
 loadBG();
 
@@ -92,7 +107,7 @@ function loadBG(){
 		drawGamePieces();
 
 		stage.add(layer);
-	}
+	};
 
 	obj.src = 'images/bg.jpg';
 }
@@ -102,9 +117,8 @@ function loadCross(){
 	cross.onload = function() {
 
 		var img = new Kinetic.Image({x: 0, y: 0, image: cross, width: 140, height: 140});
-
 		loadCircle();
-	}
+	};
 
 	cross.src = 'images/cross.png';
 }
@@ -118,7 +132,7 @@ function loadCircle(){
 		drawGamePieces();
 
 		stage.add(layer);
-	}
+	};
 
 	circle.src = 'images/circle.png';
 }

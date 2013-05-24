@@ -13,15 +13,15 @@
 
 //Tile positions on board
 
- var positions = [
-		{x:0, y:0}, {x:148, y:0}, {x:296, y:0},
-		{x:0, y:148}, {x:148, y:148}, {x:296, y:148},
-		{x:0, y:296}, {x:148, y:296}, {x:296, y:296}
-		];
+var positions = [
+{x:0, y:0}, {x:148, y:0}, {x:296, y:0},
+{x:0, y:148}, {x:148, y:148}, {x:296, y:148},
+{x:0, y:296}, {x:148, y:296}, {x:296, y:296}
+];
 //Initiaizing the board
 var board = ['-', '-', '-', '-', '-', '-', '-', '-', '-'];
 
- io = io.listen(app);
+io = io.listen(app);
 // Configuration
 io.configure(function() {
 	io.set('log level', 1);
@@ -56,13 +56,13 @@ io.sockets.on('connection', function (socket) {
 		var pic = nb_players ? 1 : 2; //cross : circle
 		nb_players++;
 		var availableGame = lookForAvailableGame(); //looking if a game is available, completing one or creating a new one
-		if (availableGame == -1){ //No game available, will create a new one
-			clients.push({turn: 0, players: [{id: socket.id, nick:'', socket: socket}]});
+		if (!clients[availableGame]){
+			clients.push({turn: 0, board: board, players: [{id: socket.id, nick:'', socket: socket}]});
 			io.sockets.socket(clients[clients.length - 1].players[0].id).emit('init', { pic: 1, id: socket.id });
 			//notifying the client he's alone for the moment
 			io.sockets.socket(clients[clients.length - 1].players[0].id).emit('info', { info: 'Waiting for an opponent', color:'red' });
 		}
-		else { // a game has one player only we can complete thie one
+		else { // a game has one player only we can complete this one
 			clients[availableGame].players.push({id: socket.id, nick:''});
 			io.sockets.socket(clients[availableGame].players[1].id).emit('init', { pic: 2, id: socket.id });
 			//inform the 1st player it's his turn to play
@@ -70,13 +70,13 @@ io.sockets.on('connection', function (socket) {
 		}
 
 		socket.on('play', function (data) { //received a move from a player
-				var id;
-				//which game is the player playing
+			var id;
+				//which game is the player playing in
 				for (var i = 0, j = clients.length; i < j; i++){
-					if ($.grep(clients[i].players, function(e){ return e.id == data['id']; }))
-					console.log("found player "+data['id']+"in id "+i);
-					id = i;
-					break;
+					if (data['id'] == clients[i].players[0].id || data['id'] == clients[i].players[1].id){
+						id = i;
+						break;
+					}
 				}
 				//who's who ?
 				var players = clients[id].players; //getting players list on this game
@@ -87,7 +87,6 @@ io.sockets.on('connection', function (socket) {
 				if (players.length < 2)
 					io.sockets.socket(data['id']).emit('valid_play', { info: 'Not enough players, waiting for an opponent', color:'red' });
 				//it's not your turn
-				console.log (data['id'] + "is trying to play. turn is on "+clients[id].turn +" which is id "+players[clients[id].turn].id);
 				if (players[clients[id].turn].id != data['id'])
 					io.sockets.socket(data['id']).emit('valid_play', { info: "It's not your turn", color:'red' });
 
@@ -97,41 +96,58 @@ io.sockets.on('connection', function (socket) {
 				io.sockets.socket(data['id']).emit('valid_play', { info: "Waiting for your opponent's move", color:'green', move: "ok" });
 				io.sockets.socket(players[enemy].id).emit('info', { info: "It's your turn", color:'green' });
 				//filling in our board
-				board[data['index']] = clients[id].turn;
+				clients[id].board[data['index']] = clients[id].turn;
 				clients[id].turn = clients[id].turn === 0 ? 1 : 0;
 				//check if somebody won
-				var win = checkWin();
+				var win = checkWin(id);
 				switch(win) {
 					case 0:
-						io.sockets.socket(players[0].id).emit('info', { info: "YOU WON !", color:'green' });
-						io.sockets.socket(players[1].id).emit('info', { info: "YOU LOST :(", color:'red' });
-					break;
-					case 1:
+					io.sockets.socket(players[0].id).emit('info', { info: "YOU WON !", color:'green' });
+					io.sockets.socket(players[1].id).emit('info', { info: "YOU LOST :(", color:'red' });
+						break;
+						case 1:
 						io.sockets.socket(players[1].id).emit('info', { info: "YOU WON !", color:'green' });
 						io.sockets.socket(players[0].id).emit('info', { info: "YOU LOST :(", color:'red' });
-					break;
-				}
+							break;
+						}
+						if (win === 0 || win ==1){
+							io.sockets.socket(players[0].id).emit('countdown');
+							io.sockets.socket(players[1].id).emit('countdown');
+						setTimeout(function() {
+							restartGame(id);
+						}, 10000);
+						}
+					});
 
-		});
-	});
+});
 
-function checkWin()
+function restartGame(id){
+	console.log("GONNA RESTART GAME "+ id);
+	clients[id].board = board;
+	var enemy = clients[id].turn;
+	clients[id].turn = clients[id].turn === 0 ? 1 : 0;
+	io.sockets.socket(clients[id].players[enemy].id).emit('info', { info: "Waiting for your opponent's move", color:'green', move: "ok" });
+	io.sockets.socket(clients[id].players[clients[id].turn].id).emit('info', { info: "It's your turn", color:'green' });
+
+}
+
+function checkWin(id)
 {
 	var h1, h2, h3, v1, v2, v3, dr, dl;
 	//h = horizontal
 	//v = vertical
 	//dl = left diag, dr = right diag
 
-	h1 = board[0]+board[1]+board[2];
-	h2 = board[3]+board[4]+board[5];
-	h3 = board[6]+board[7]+board[8];
+	h1 = clients[id].board[0]+clients[id].board[1]+clients[id].board[2];
+	h2 = clients[id].board[3]+clients[id].board[4]+clients[id].board[5];
+	h3 = clients[id].board[6]+clients[id].board[7]+clients[id].board[8];
 
-	v1 = board[0]+board[3]+board[6];
-	v2 = board[1]+board[4]+board[7];
-	v3 = board[2]+board[5]+board[8];
+	v1 = clients[id].board[0]+clients[id].board[3]+clients[id].board[6];
+	v2 = clients[id].board[1]+clients[id].board[4]+clients[id].board[7];
+	v3 = clients[id].board[2]+clients[id].board[5]+clients[id].board[8];
 
-	dl = board[2]+board[4]+board[6];
-	dr = board[0]+board[4]+board[8];
+	dl = clients[id].board[2]+clients[id].board[4]+clients[id].board[6];
+	dr = clients[id].board[0]+clients[id].board[4]+clients[id].board[8];
 
 	//if all the line is 0 (0+0+0), player 0 has won
 	if (h1 === 0 || h2 === 0 || h3 === 0 || v1=== 0 || v2 === 0 || v3 === 0 || dl === 0 || dr === 0)
@@ -144,12 +160,13 @@ function checkWin()
 }
 
 function lookForAvailableGame(){
-	if (clients.length === 0)
-		return (-1);
 	for (var i = 0, j = clients.length; i < j; i++){
 		//if a game has only one player, returning the id of the game
-		if (clients[i].players.length > 0 && clients[i].players.length  < 2)
+		if (clients[i].players.length == 1){
+			console.log("filling in game "+i);
 			return i;
+		}
 	}
-	return (-1);
+	//else creating a new one, with clients.length as id
+	return clients.length;
 }
